@@ -42,6 +42,9 @@ public class LocationHeaderRewritingFilter extends ZuulFilter {
     @Autowired
     private RouteLocator routeLocator;
 
+    @Value("${redirect.scheme}")
+    private String scheme;
+
     @Value("${redirect.host}")
     private String host;
 
@@ -86,7 +89,7 @@ public class LocationHeaderRewritingFilter extends ZuulFilter {
                 UriComponents redirectedUriComps = redirectedUriBuilder.build();
 
                 String modifiedLocation = redirectedUriBuilder
-                        .scheme(originalRequestUri.getScheme())
+                        .scheme(scheme)
                         .host(host)
                         .port(port).replacePath(redirectedUriComps.getPath())
                         .queryParam("redirect", true)
