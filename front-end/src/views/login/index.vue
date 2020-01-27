@@ -1,3 +1,18 @@
+<!--
+
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+        http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+
+-->
 <template>
   <div class="login-container">
 
@@ -38,6 +53,9 @@
       </el-form-item>
 
       <el-button :loading="loading" type="primary" style="width:100%;margin-bottom:30px;" @click.native.prevent="handleLogin">{{ $t('login.logIn') }}</el-button>
+      <!-- <el-button class="thirdparty-button" type="primary" @click="showDialog=true">
+        Or connect with
+      </el-button> -->
     </el-form>
 
     <el-dialog :title="$t('login.thirdparty')" :visible.sync="showDialog" append-to-body>
@@ -102,7 +120,10 @@ export default {
     // window.addEventListener('hashchange', this.afterQRScan)
   },
   destroyed() {
-    // window.removeEventListener('hashchange', this.afterQRScan)
+    window.removeEventListener('hashchange', this.afterQRScan)
+  },
+  mounted() {
+    window.addEventListener('message', this.handleMessage)
   },
   methods: {
     showPwd() {
@@ -112,13 +133,19 @@ export default {
         this.passwordType = 'password'
       }
     },
+    handleMessage(event) {
+      const data = event.data
+      if (data.hasOwnProperty('name') && data.hasOwnProperty('accessToken')) {
+        // to do set token, track task https://github.com/apache/pulsar-manager/issues/14
+      }
+    },
     handleLogin() {
       this.$refs.loginForm.validate(valid => {
         if (valid) {
           this.loading = true
           this.$store.dispatch('LoginByUsername', this.loginForm).then(() => {
             this.loading = false
-            this.$router.push({ path: this.redirect || '/management/clusters' })
+            this.$router.push({ path: this.redirect || '/management/roles' })
           }).catch(() => {
             this.loading = false
           })
@@ -261,7 +288,12 @@ $light_gray:#eee;
   .thirdparty-button {
     position: absolute;
     right: 35px;
-    bottom: 28px;
+    bottom: 1px;
+  }
+  @media only screen and (max-width: 470px) {
+    .thirdparty-button {
+      display: none;
+    }
   }
 }
 </style>

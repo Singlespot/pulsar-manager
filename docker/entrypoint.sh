@@ -37,5 +37,25 @@ echo 'Starting Pulsar Manager Back end'
 
 touch /pulsar-manager/supervisor.sock
 chmod 777 /pulsar-manager/supervisor.sock
-supervisord -c /etc/supervisord.conf -n
 
+
+if [[ -n "$JWT_TOKEN" ]] && [[ -n "$PUBLIC_KEY" ]] && [[ -n "$PRIVATE_KEY" ]]
+then
+  echo "Use public key and private key to init JWT."
+  supervisord -c /etc/supervisord-private-key.conf -n
+elif [[ -n "$JWT_TOKEN" ]] && [[ -n "$SECRET_KEY" ]]
+then
+  echo "Use secret key to init JWT."
+  supervisord -c /etc/supervisord-secret-key.conf -n
+elif [[ -n "$JWT_TOKEN" ]]
+then
+  echo "Enable JWT auth."
+  supervisord -c /etc/supervisord-token.conf -n
+elif [[ -n "$SPRING_CONFIGURATION_FILE" ]]
+then
+  echo "Start Pulsar Manager by specifying a configuration file."
+  supervisord -c /etc/supervisord-configuration-file.conf -n
+else
+  echo "Start servie no enable JWT."
+  supervisord -c /etc/supervisord.conf -n
+fi

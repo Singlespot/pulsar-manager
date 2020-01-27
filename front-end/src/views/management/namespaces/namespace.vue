@@ -1,3 +1,18 @@
+<!--
+
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+        http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+
+-->
 <template>
   <div class="app-container">
     <div class="createPost-container">
@@ -185,7 +200,7 @@
               :placeholder="$t('namespace.policy.selectRole')"
               multiple
               style="width:300px;"
-              @change="handleChangeOptions()">
+              @change="handleChangeOptions(tag)">
               <el-option
                 v-for="item in roleMapOptions[tag]"
                 :key="item.value"
@@ -1090,7 +1105,8 @@ export default {
       getPermissions(tenantNamespace).then(response => {
         if (!response.data) return
         for (var key in response.data) {
-          this.roleMap[key] = response.data.key
+          this.dynamicTags.push(key)
+          this.roleMap[key] = response.data[key]
           this.roleMapOptions[key] = this.roleOptions
         }
       })
@@ -1255,7 +1271,15 @@ export default {
       this.inputVisible = false
       this.inputValue = ''
     },
-    handleChangeOptions() {
+    handleChangeOptions(role) {
+      grantPermissions(this.tenantNamespace, role, this.roleMap[role]).then(response => {
+        this.$notify({
+          title: 'success',
+          message: this.$i18n.t('namespace.notification.addRoleActionsSuccess'),
+          type: 'success',
+          duration: 3000
+        })
+      })
       this.$forceUpdate()
     },
     revokeAllRole() {

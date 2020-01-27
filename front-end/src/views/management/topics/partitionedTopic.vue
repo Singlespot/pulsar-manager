@@ -1,3 +1,18 @@
+<!--
+
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+        http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+
+-->
 <template>
   <div class="app-container">
     <div class="createPost-container">
@@ -41,6 +56,13 @@
           <el-table-column :label="$t('common.outBytes')" prop="outBytes"/>
         </el-table>
         <h4>{{ $t('topic.subscription.subscriptions') }}</h4>
+        <el-button
+          class="filter-item"
+          type="success"
+          style="margin-bottom: 15px"
+          @click="handleCreateSub">
+          New Sub
+        </el-button>
         <el-row :gutter="24">
           <el-col :xs="{span: 24}" :sm="{span: 24}" :md="{span: 24}" :lg="{span: 24}" :xl="{span: 24}">
             <el-table
@@ -112,6 +134,9 @@
                       </el-dropdown-item>
                       <el-dropdown-item :command="{'action': 'clear', 'subscription': scope.row.subscription }">
                         {{ $t('topic.subscription.clear') }}
+                      </el-dropdown-item>
+                      <el-dropdown-item :command="{'action': 'unsub', 'subscription': scope.row.subscription }">
+                        {{ $t('topic.subscription.unsub') }}
                       </el-dropdown-item>
                     </el-dropdown-menu>
                   </el-dropdown>
@@ -201,7 +226,7 @@
               :placeholder="$t('topic.selectRoleMessage')"
               multiple
               style="width:300px;"
-              @change="handleChangeOptions()">
+              @change="handleChangeOptions(tag)">
               <el-option
                 v-for="item in roleMapOptions[tag]"
                 :key="item.value"
@@ -253,6 +278,12 @@
             <span>{{ $t('topic.subscription.clearMessageConfirm') }}</span>
           </el-form-item>
         </el-form-item>
+        <el-form-item v-if="dialogStatus==='createSub'">
+          <el-input v-model="currentSubscription" placeholder="Please input sub name"/>
+        </el-form-item>
+        <el-form-item v-if="dialogStatus==='unsub'">
+          <h4>{{ $t('topic.subscription.deleteSubConfirm') }}</h4>
+        </el-form-item>
         <el-form-item>
           <el-button type="primary" @click="handleOptions()">{{ $t('table.confirm') }}</el-button>
           <el-button @click="dialogFormVisible=false">{{ $t('table.cancel') }}</el-button>
@@ -270,12 +301,16 @@ import {
   deletePartitionTopicOnCluster,
   expireMessagesAllSubscriptionsOnCluster,
   resetCursorByTimestampOnCluster,
-  clearBacklogOnCluster
+  clearBacklogOnCluster,
+  getPermissionsOnCluster,
+  grantPermissionsOnCluster,
+  revokePermissionsOnCluster
 } from '@/api/topics'
 import { fetchTopicsByPulsarManager } from '@/api/topics'
 import Pagination from '@/components/Pagination' // Secondary package based on el-pagination
 import { formatBytes } from '@/utils/index'
 import { numberFormatter } from '@/filters/index'
+import { putSubscriptionOnCluster, deleteSubscriptionOnCluster } from '@/api/subscriptions'
 
 const defaultForm = {
   persistent: '',
@@ -329,7 +364,9 @@ export default {
         delete: this.$i18n.t('topic.deleteTopic'),
         expire: this.$i18n.t('topic.subscription.msgExpired'),
         clear: this.$i18n.t('topic.subscription.clearMessage'),
-        reset: this.$i18n.t('topic.subscription.resetByTime')
+        reset: this.$i18n.t('topic.subscription.resetByTime'),
+        createSub: this.$i18n.t('topic.subscription.sub'),
+        deleteSub: this.$i18n.t('topic.subscription.unsub')
       },
       dialogFormVisible: false,
       dialogStatus: '',
@@ -369,6 +406,7 @@ export default {
     this.getTopicsList()
     this.getReplicatedClusters()
     this.initTopicStats()
+    this.initPermissions()
   },
   methods: {
     getRemoteTenantsList() {
@@ -395,6 +433,7 @@ export default {
     initTopicStats() {
       fetchPartitionTopicStats(this.postForm.persistent, this.tenantNamespaceTopic, true).then(response => {
         if (!response.data) return
+        this.partitionTopicStats = []
         this.partitionTopicStats.push({
           inMsg: numberFormatter(response.data.msgRateIn, 2),
           outMsg: numberFormatter(response.data.msgRateOut, 2),
@@ -403,22 +442,30 @@ export default {
         })
         var prefix = this.postForm.persistent + '://' + this.tenantNamespaceTopic
         var tempPartitionsList = Object.keys(response.data.partitions)
+        this.partitionsList = []
         for (var i = 0; i < tempPartitionsList.length; i++) {
           var key = prefix + '-partition-' + i
-          var partition = this.postForm.topic + '-partition-' + i
-          this.partitionsList.push({
-            'partition': partition,
-            'producers': response.data.partitions[key].publishers.length,
-            'subscriptions': Object.keys(response.data.partitions[key].subscriptions).length,
-            'inMsg': numberFormatter(response.data.partitions[key].msgRateIn, 2),
-            'outMsg': numberFormatter(response.data.partitions[key].msgRateOut, 2),
-            'inBytes': formatBytes(response.data.partitions[key].msgThroughputIn),
-            'outBytes': formatBytes(response.data.partitions[key].msgThroughputOut),
-            'storageSize': formatBytes(response.data.partitions[key].storageSize, 0),
-            'partitionTopicLink': '/management/topics/' + this.postForm.persistent + '/' + this.tenantNamespaceTopic + '-partition-' + i + '/topic'
-          })
+          if (response.data.partitions.hasOwnProperty(key)) {
+            var partition = this.postForm.topic + '-partition-' + i
+            var publishers = 0
+            if (response.data.partitions[key].hasOwnProperty('publishers')) {
+              publishers = response.data.partitions[key].publishers.length
+            }
+            this.partitionsList.push({
+              'partition': partition,
+              'producers': publishers,
+              'subscriptions': Object.keys(response.data.partitions[key].subscriptions).length,
+              'inMsg': numberFormatter(response.data.partitions[key].msgRateIn, 2),
+              'outMsg': numberFormatter(response.data.partitions[key].msgRateOut, 2),
+              'inBytes': formatBytes(response.data.partitions[key].msgThroughputIn),
+              'outBytes': formatBytes(response.data.partitions[key].msgThroughputOut),
+              'storageSize': formatBytes(response.data.partitions[key].storageSize, 0),
+              'partitionTopicLink': '/management/topics/' + this.postForm.persistent + '/' + this.tenantNamespaceTopic + '-partition-' + i + '/topic'
+            })
+          }
         }
         var index = 0
+        this.subscriptionsList = []
         for (var s in response.data.subscriptions) {
           index += 1
           var type = 'Exclusive'
@@ -505,6 +552,16 @@ export default {
     getCurrentCluster() {
       return this.clusterForm.cluster || ''
     },
+    initPermissions() {
+      getPermissionsOnCluster(this.getCurrentCluster(), this.postForm.persistent, this.tenantNamespaceTopic).then(response => {
+        if (!response.data) return
+        for (var key in response.data) {
+          this.dynamicTags.push(key)
+          this.roleMap[key] = response.data[key]
+          this.roleMapOptions[key] = this.roleOptions
+        }
+      })
+    },
     handleClick(tab, event) {
       this.currentTabName = tab.name
       this.$router.push({ query: {
@@ -514,6 +571,16 @@ export default {
     },
     handleClose(tag) {
       this.dynamicTags.splice(this.dynamicTags.indexOf(tag), 1)
+      revokePermissionsOnCluster(this.getCurrentCluster(), this.postForm.persistent, this.tenantNamespaceTopic, tag).then(response => {
+        this.$notify({
+          title: 'success',
+          message: this.$i18n.t('namespace.notification.removeRoleSuccess'),
+          type: 'success',
+          duration: 3000
+        })
+        delete this.roleMap[tag]
+        delete this.roleMapOptions[tag]
+      })
     },
     showInput() {
       this.inputVisible = true
@@ -533,22 +600,30 @@ export default {
           this.inputValue = ''
           return
         }
-        // grantPermissions(this.currentNamespace, inputValue, this.roleMap[inputValue]).then(response => {
-        //   this.$notify({
-        //     title: 'success',
-        //     message: 'Add success',
-        //     type: 'success',
-        //     duration: 3000
-        //   })
-        //   this.dynamicTags.push(inputValue)
-        //   this.roleMap[inputValue] = []
-        //   this.roleMapOptions[inputValue] = this.roleOptions
-        // })
+        grantPermissionsOnCluster(this.getCurrentCluster(), this.postForm.persistent, this.tenantNamespaceTopic, inputValue, this.roleMap[inputValue]).then(response => {
+          this.$notify({
+            title: 'success',
+            message: this.$i18n.t('namespace.notification.addRoleSuccess'),
+            type: 'success',
+            duration: 3000
+          })
+          this.dynamicTags.push(inputValue)
+          this.roleMap[inputValue] = []
+          this.roleMapOptions[inputValue] = this.roleOptions
+        })
       }
       this.inputVisible = false
       this.inputValue = ''
     },
-    handleChangeOptions() {
+    handleChangeOptions(role) {
+      grantPermissionsOnCluster(this.getCurrentCluster(), this.postForm.persistent, this.tenantNamespaceTopic, role, this.roleMap[role]).then(response => {
+        this.$notify({
+          title: 'success',
+          message: 'Set permissions success',
+          type: 'success',
+          duration: 3000
+        })
+      })
       this.$forceUpdate()
     },
     handleDeletePartitionTopic() {
@@ -582,6 +657,12 @@ export default {
               break
             case 'clear':
               this.clearAllSubMessage()
+              break
+            case 'createSub':
+              this.createSub()
+              break
+            case 'unsub':
+              this.deleteSub()
               break
           }
         }
@@ -640,12 +721,56 @@ export default {
         this.dialogFormVisible = false
         this.getPartitionTopicInfo()
       })
+    },
+    handleCreateSub() {
+      this.currentSubscription = ''
+      this.dialogStatus = 'createSub'
+      this.dialogFormVisible = true
+    },
+    createSub() {
+      if (this.currentSubscription.length <= 0) {
+        this.$notify({
+          title: 'error',
+          message: this.$i18n.t('topic.subscription.subNotification'),
+          type: 'error',
+          duration: 3000
+        })
+        return
+      }
+      putSubscriptionOnCluster(this.getCurrentCluster(), this.postForm.persistent, this.tenantNamespaceTopic, this.currentSubscription).then(response => {
+        this.$notify({
+          title: 'success',
+          message: this.$i18n.t('topic.subscription.createSubSuccess'),
+          type: 'success',
+          duration: 3000
+        })
+        this.initTopicStats()
+        this.dialogFormVisible = false
+      })
+    },
+    deleteSub() {
+      deleteSubscriptionOnCluster(this.getCurrentCluster(), this.postForm.persistent, this.tenantNamespaceTopic, this.currentSubscription).then(response => {
+        this.$notify({
+          title: 'success',
+          message: this.$i18n.t('topic.subscription.deleteSubSuccess'),
+          type: 'success',
+          duration: 3000
+        })
+        this.initTopicStats()
+        this.dialogFormVisible = false
+      })
     }
   }
 }
 </script>
 
 <style>
+.role-el-tag {
+  background-color: #fff !important;
+  border: none !important;
+  font-size: 16px !important;
+  color: black !important;
+}
 .split-line {
   background: #e6e9f3;
   border: none;

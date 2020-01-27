@@ -16,13 +16,15 @@ import axios from 'axios'
 import { Message } from 'element-ui'
 import store from '@/store'
 import { getToken } from '@/utils/auth'
+import { getName } from '@/utils/username'
 import { getEnvironment } from '@/utils/environment'
+import { getTenant } from '@/utils/tenant'
 import router from '../router'
 
 // create an axios instance
 const service = axios.create({
   baseURL: process.env.BASE_API, // api 的 base_url
-  timeout: 5000 // request timeout
+  timeout: 60000 // request timeout
 })
 
 // request interceptor
@@ -32,6 +34,8 @@ service.interceptors.request.use(
     if (store.getters.token) {
       config.headers['token'] = getToken()
     }
+    config.headers['username'] = getName()
+    config.headers['tenant'] = getTenant()
     config.headers['environment'] = getEnvironment()
     return config
   },
@@ -73,6 +77,8 @@ service.interceptors.response.use(
         })
         return
       }
+    } else if (error.response.data.hasOwnProperty('reason')) {
+      message = error.response.data.reason
     } else {
       message = error.response.data
       if (message.indexOf('Trying to subscribe with incompatible') >= 0) {
