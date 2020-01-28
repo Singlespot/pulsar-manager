@@ -3,10 +3,10 @@ name: Java CI
 on: 
   push:
     branches:
-      - master
+      - singlespot/master
   pull_request:
     branches:
-      - master
+      - singlespot/master
 
 jobs:
   build:
