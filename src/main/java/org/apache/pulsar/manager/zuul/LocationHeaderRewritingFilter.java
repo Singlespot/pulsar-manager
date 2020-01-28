@@ -48,9 +48,6 @@ public class LocationHeaderRewritingFilter extends ZuulFilter {
     @Value("${redirect.port}")
     private String port;
 
-    @Value("${redirect.scheme}")
-    private String scheme;
-
     private final RouteLocator routeLocator;
 
     @Autowired
