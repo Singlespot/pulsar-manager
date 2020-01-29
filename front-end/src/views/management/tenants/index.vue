@@ -1,3 +1,18 @@
+<!--
+
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+        http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+
+-->
 <template>
   <div class="app-container">
     <div class="filter-container">
@@ -51,6 +66,31 @@
                 class="list-el-tag">
                 {{ tag }}
               </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column :label="$t('common.inMsg')" align="center">
+            <template slot-scope="scope">
+              <i class="el-icon-download" style="margin-right: 2px"/><span>{{ scope.row.inMsg }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column :label="$t('common.outMsg')" align="center">
+            <template slot-scope="scope">
+              <i class="el-icon-upload2" style="margin-right: 2px"/><span>{{ scope.row.outMsg }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column :label="$t('common.inBytes')" align="center">
+            <template slot-scope="scope">
+              <i class="el-icon-download" style="margin-right: 2px"/><span>{{ scope.row.inBytes }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column :label="$t('common.outBytes')" align="center">
+            <template slot-scope="scope">
+              <i class="el-icon-upload2" style="margin-right: 2px"/><span>{{ scope.row.outBytes }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column :label="$t('common.storageSize')" align="center">
+            <template slot-scope="scope">
+              <span>{{ scope.row.storageSize }}</span>
             </template>
           </el-table-column>
           <el-table-column :label="$t('table.actions')" align="center" class-name="small-padding fixed-width">
@@ -113,6 +153,9 @@ import {
 } from '@/api/tenants'
 import { fetchClusters } from '@/api/clusters'
 import { validateEmpty } from '@/utils/validate'
+import { formatBytes } from '@/utils/index'
+import { numberFormatter } from '@/filters/index'
+
 const defaultForm = {
   cluster: ''
 }
@@ -182,12 +225,25 @@ export default {
             if (allowedClusters !== '') {
               allowedClustersArray = allowedClusters.split(',')
             }
-            this.localList.push({
+            const data = {
               'tenant': response.data.data[i]['tenant'],
               'namespace': response.data.data[i]['namespaces'],
               'allowedClusters': allowedClustersArray,
-              'adminRoles': adminRolesArray
-            })
+              'adminRoles': adminRolesArray,
+              'inMsg': numberFormatter(0, 2),
+              'outMsg': numberFormatter(0, 2),
+              'inBytes': formatBytes(0),
+              'outBytes': formatBytes(0),
+              'storageSize': formatBytes(0, 0)
+            }
+            if (response.data.data[i].hasOwnProperty('inMsg')) {
+              data['inMsg'] = numberFormatter(response.data.data[i]['inMsg'], 2)
+              data['outMsg'] = numberFormatter(response.data.data[i]['outMsg'], 2)
+              data['inBytes'] = numberFormatter(response.data.data[i]['inBytes'])
+              data['outBytes'] = numberFormatter(response.data.data[i]['outBytes'])
+              data['storageSize'] = numberFormatter(response.data.data[i]['storageSize'], 2)
+            }
+            this.localList.push(data)
           }
           this.total = response.data.total
           this.listQuery.page = response.data.pageNum

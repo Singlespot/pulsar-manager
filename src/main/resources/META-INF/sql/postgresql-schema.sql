@@ -115,3 +115,61 @@ CREATE TABLE IF NOT EXISTS consumers_stats (
   time_stamp BIGINT,
   metadata text
 );
+
+CREATE TABLE IF NOT EXISTS tokens (
+  token_id BIGSERIAL PRIMARY KEY,
+  role varchar(256) NOT NULL,
+  description varchar(128),
+  token varchar(1024) NOT NUll,
+  UNIQUE (role)
+);
+
+CREATE TABLE IF NOT EXISTS users (
+  user_id BIGSERIAL PRIMARY KEY AUTO_INCREMENT,
+  access_token varchar(256) NOT NULL,
+  name varchar(256) NOT NULL,
+  description varchar(128),
+  email varchar(256),
+  phone_number varchar(48),
+  location varchar(256),
+  company varchar(256),
+  expire BIGINT NOT NULL,
+  password varchar(256),
+  UNIQUE (name)
+);
+
+CREATE TABLE IF NOT EXISTS roles (
+  role_id BIGSERIAL PRIMARY KEY AUTO_INCREMENT,
+  role_name varchar(256) NOT NULL,
+  role_source varchar(256) NOT NULL,
+  description varchar(128),
+  resource_id BIGINT NOT NULL,
+  resource_type varchar(48) NOT NULL,
+  resource_name varchar(48) NOT NULL,
+  resource_verbs varchar(256) NOT NULL,
+  flag INT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS tenants (
+  tenant_id BIGSERIAL PRIMARY KEY AUTO_INCREMENT,
+  tenant varchar(255) NOT NULL,
+  admin_roles varchar(255),
+  allowed_clusters varchar(255),
+  environment_name varchar(255),
+  UNIQUE(tenant)
+);
+
+CREATE TABLE IF NOT EXISTS namespaces (
+  namespace_id BIGSERIAL PRIMARY KEY AUTO_INCREMENT,
+  tenant varchar(255) NOT NULL,
+  namespace varchar(255) NOT NULL,
+  UNIQUE(tenant, namespace)
+);
+
+CREATE TABLE IF NOT EXISTS role_binding(
+  role_binding_id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  name varchar(256) NOT NULL,
+  description varchar(256),
+  role_id BIGINT NOT NULL,
+  user_id BIGINT NOT NULL
+);
