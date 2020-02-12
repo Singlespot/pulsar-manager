@@ -12,7 +12,9 @@
 -- limitations under the License.
 --
 
-CREATE DATABASE pulsar_manager;
+ALTER USER pulsar WITH PASSWORD 'pulsar';
+CREATE DATABASE pulsar_manager OWNER pulsar;
+GRANT ALL PRIVILEGES ON DATABASE pulsar_manager to pulsar;
 
 \c pulsar_manager;
 
@@ -126,14 +128,14 @@ CREATE TABLE IF NOT EXISTS tokens (
 
 CREATE TABLE IF NOT EXISTS users (
   user_id BIGSERIAL PRIMARY KEY,
-  access_token varchar(256) NOT NULL,
+  access_token varchar(256),
   name varchar(256) NOT NULL,
   description varchar(128),
   email varchar(256),
   phone_number varchar(48),
   location varchar(256),
   company varchar(256),
-  expire BIGINT NOT NULL,
+  expire BIGINT,
   password varchar(256),
   UNIQUE (name)
 );
@@ -167,7 +169,7 @@ CREATE TABLE IF NOT EXISTS namespaces (
 );
 
 CREATE TABLE IF NOT EXISTS role_binding(
-  role_binding_id BIGINT PRIMARY KEY,
+  role_binding_id BIGSERIAL PRIMARY KEY,
   name varchar(256) NOT NULL,
   description varchar(256),
   role_id BIGINT NOT NULL,
