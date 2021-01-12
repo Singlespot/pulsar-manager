@@ -53,9 +53,9 @@
       </el-form-item>
 
       <el-button :loading="loading" type="primary" style="width:100%;margin-bottom:30px;" @click.native.prevent="handleLogin">{{ $t('login.logIn') }}</el-button>
-      <!-- <el-button class="thirdparty-button" type="primary" @click="showDialog=true">
+      <el-button class="thirdparty-button" type="primary" @click="showDialog=true">
         Or connect with
-      </el-button> -->
+      </el-button>
     </el-form>
 
     <el-dialog :title="$t('login.thirdparty')" :visible.sync="showDialog" append-to-body>
