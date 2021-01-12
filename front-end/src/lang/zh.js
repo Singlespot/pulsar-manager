@@ -369,8 +369,8 @@ export default {
       ensembleSizeDescription: ': number of bookies to use when creating a ledger.',
       writeQuorumSizeDescription: ': number of replicas to store for each message.',
       ackQuorumSizeDescription: ': number of responses to wait before claiming a message is guaranteed to be stored.',
-      ensembleSize: 'Ensembel Size',
-      inputEnsemble: 'Please input ensembel',
+      ensembleSize: 'Ensemble Size',
+      inputEnsemble: 'Please input ensemble',
       writeQuorumSize: 'Write Quorum Size',
       inputWriteQuorumSize: 'Please input Write Quorum Size',
       readQuorumSize: 'Ack Quorum Size',
@@ -635,7 +635,8 @@ export default {
     deleteTopicMessage: 'Are you sure you want to delete this topic?',
     partitionedTopicName: 'Partitioned Topic Name',
     selectRoleMessage: 'Please Select Role',
-    backlogOpeartion: 'Backlog Operation'
+    backlogOpeartion: 'Backlog Operation',
+    autoRefresh: 'Auto Refresh'
   },
   cluster: {
     label: 'Cluster',

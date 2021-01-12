@@ -31,16 +31,26 @@ import org.apache.pulsar.manager.utils.ResourceVerbs;
 import org.junit.Assert;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.mockito.Mockito;
 import org.powermock.core.classloader.annotations.PowerMockIgnore;
 import org.powermock.core.classloader.annotations.PrepareForTest;
 import org.powermock.modules.junit4.PowerMockRunner;
 import org.powermock.modules.junit4.PowerMockRunnerDelegate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.junit4.SpringRunner;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.Map;
+
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @RunWith(PowerMockRunner.class)
 @PowerMockRunnerDelegate(SpringRunner.class)
@@ -73,38 +83,41 @@ public class RolesServiceImplTest {
     @Autowired
     private NamespacesRepository namespacesRepository;
 
+    @MockBean
+    private JwtService jwtService;
+
     @Test
     public void validateRoleInfoEntityTest() {
         RoleInfoEntity roleInfoEntity = new RoleInfoEntity();
 
         Map<String, String> roleNameIsEmpty = rolesService.validateRoleInfoEntity(roleInfoEntity);
-        Assert.assertEquals(roleNameIsEmpty.get("error"), "Role name cannot be empty");
+        Assert.assertEquals("Role name cannot be empty", roleNameIsEmpty.get("error"));
 
         roleInfoEntity.setRoleName("------");
 
         Map<String, String> resourceNameIsEmpty = rolesService.validateRoleInfoEntity(roleInfoEntity);
-        Assert.assertEquals(resourceNameIsEmpty.get("error"), "Resource name cannot be empty");
+        Assert.assertEquals("Resource name cannot be empty", resourceNameIsEmpty.get("error"));
 
         roleInfoEntity.setResourceName("===========");
 
         Map<String, String> roleNameIsIllegal = rolesService.validateRoleInfoEntity(roleInfoEntity);
-        Assert.assertEquals(roleNameIsIllegal.get("error"), "Role name is illegal");
+        Assert.assertEquals("Role name is illegal", roleNameIsIllegal.get("error"));
 
         roleInfoEntity.setRoleName("testRoleName");
 
         Map<String, String> resourceNameIsIllegal = rolesService.validateRoleInfoEntity(roleInfoEntity);
-        Assert.assertEquals(resourceNameIsIllegal.get("error"), "Resource Name is illegal");
+        Assert.assertEquals("Resource Name is illegal", resourceNameIsIllegal.get("error"));
 
         roleInfoEntity.setResourceName("testResourceName");
 
         roleInfoEntity.setResourceType("test-resourceType");
         Map<String, String> resourceTypeIsIllegal = rolesService.validateRoleInfoEntity(roleInfoEntity);
-        Assert.assertEquals(resourceTypeIsIllegal.get("error"), "Resource type is illegal");
+        Assert.assertEquals("Resource type is illegal", resourceTypeIsIllegal.get("error"));
 
         roleInfoEntity.setResourceId(10);
         roleInfoEntity.setResourceType(ResourceType.TENANTS.name());
         Map<String, String> resourceNoExist = rolesService.validateRoleInfoEntity(roleInfoEntity);
-        Assert.assertEquals(resourceNoExist.get("error"), "Tenant no exist, please check");
+        Assert.assertEquals("Tenant no exist, please check", resourceNoExist.get("error"));
 
         TenantEntity tenantEntity = new TenantEntity();
         tenantEntity.setTenant("test-tenant");
@@ -116,7 +129,7 @@ public class RolesServiceImplTest {
         roleInfoEntity.setResourceId(20);
         roleInfoEntity.setResourceType(ResourceType.NAMESPACES.name());
         Map<String, String> namespaceNoExist = rolesService.validateRoleInfoEntity(roleInfoEntity);
-        Assert.assertEquals(namespaceNoExist.get("error"), "Namespace no exist, please check");
+        Assert.assertEquals("Namespace no exist, please check", namespaceNoExist.get("error"));
 
         NamespaceEntity namespaceEntity = new NamespaceEntity();
         namespaceEntity.setTenant("test-tenant");
@@ -126,23 +139,23 @@ public class RolesServiceImplTest {
 
         roleInfoEntity.setResourceVerbs("xxxx");
         Map<String, String> stringMapVerbs = rolesService.validateRoleInfoEntity(roleInfoEntity);
-        Assert.assertTrue(stringMapVerbs.get("error").startsWith("Verb"));
+        assertTrue(stringMapVerbs.get("error").startsWith("Verb"));
 
         roleInfoEntity.setResourceType(ResourceType.TOPICS.name());
         roleInfoEntity.setResourceVerbs(ResourceVerbs.ADMIN.name());
         Map<String, String> stringMapTopics = rolesService.validateRoleInfoEntity(roleInfoEntity);
-        Assert.assertEquals(stringMapTopics.get("error"),
-                "admin should not be excluded for resources of type topic");
+        Assert.assertEquals("admin should not be excluded for resources of type topic",
+                stringMapTopics.get("error"));
 
         roleInfoEntity.setResourceType(ResourceType.TENANTS.name());
         roleInfoEntity.setResourceVerbs(ResourceVerbs.PRODUCE.name() + "," +  ResourceVerbs.CONSUME.name());
         Map<String, String> stringMapTenants = rolesService.validateRoleInfoEntity(roleInfoEntity);
-        Assert.assertEquals(stringMapTenants.get("error"), "Type TENANTS include not supported verbs");
+        Assert.assertEquals("Type TENANTS include not supported verbs", stringMapTenants.get("error"));
 
         roleInfoEntity.setResourceType(ResourceType.ALL.name());
         roleInfoEntity.setResourceVerbs(ResourceVerbs.ADMIN.name());
         Map<String, String> stringMapAll = rolesService.validateRoleInfoEntity(roleInfoEntity);
-        Assert.assertEquals(stringMapAll.get("message"), "Role validate success");
+        Assert.assertEquals("Role validate success", stringMapAll.get("message"));
     }
 
     @Test
@@ -186,4 +199,27 @@ public class RolesServiceImplTest {
                 "test-access-token", "test-tenant");
         Assert.assertEquals(currentTenantValidateSuccess.get("message"), "Validate tenant success");
     }
+
+    @Test
+    public void isSuperUser_Permits_ifUserManagementIsOff_andDefaultUserIsUsed() {
+        ReflectionTestUtils.setField(rolesService, "userManagementEnabled", false);
+        String account = "pulsar";
+        String password = "pulsar";
+        String token = jwtService.toToken(account + "-" + password);
+
+        when(jwtService.getToken(Mockito.anyString())).thenReturn(token);
+        assertTrue(rolesService.isSuperUser(token));
+        ReflectionTestUtils.setField(rolesService, "userManagementEnabled", true);
+    }
+
+    @Test
+    public void isSuperUser_Forbids_ifUserManagementIsOn_andDefaultUserIsUsed() {
+        String account = "pulsar";
+        String password = "pulsar";
+        String token = jwtService.toToken(account + "-" + password);
+
+        assertFalse(rolesService.isSuperUser(token));
+        verify(jwtService, never()).getToken(anyString());
+    }
+
 }

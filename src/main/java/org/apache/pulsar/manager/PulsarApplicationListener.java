@@ -14,30 +14,29 @@
 package org.apache.pulsar.manager;
 
 import com.github.pagehelper.Page;
-import com.google.common.collect.Maps;
-import org.apache.commons.lang3.StringUtils;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.pulsar.client.admin.PulsarAdminException;
 import org.apache.pulsar.manager.entity.EnvironmentEntity;
 import org.apache.pulsar.manager.entity.EnvironmentsRepository;
-import org.apache.pulsar.manager.utils.HttpUtil;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.pulsar.manager.service.PulsarAdminService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationListener;
 import org.springframework.context.event.ContextRefreshedEvent;
 import org.springframework.stereotype.Component;
 
-import java.util.Map;
 import java.util.Optional;
 
 /**
  * PulsarApplicationListener do something after the spring framework initialization is complete.
  */
 @Component
+@Slf4j
 public class PulsarApplicationListener implements ApplicationListener<ContextRefreshedEvent> {
 
-    private static final Logger log = LoggerFactory.getLogger(PulsarApplicationListener.class);
-
     private final EnvironmentsRepository environmentsRepository;
+
+    private final PulsarAdminService pulsarAdminService;
 
     @Value("${default.environment.name}")
     private String defaultEnvironmentName;
@@ -45,11 +44,10 @@ public class PulsarApplicationListener implements ApplicationListener<ContextRef
     @Value("${default.environment.service_url}")
     private String defaultEnvironmentServiceUrl;
 
-    @Value("${backend.jwt.token}")
-    private String pulsarJwtToken;
-
-    public PulsarApplicationListener(EnvironmentsRepository environmentsRepository) {
+    @Autowired
+    public PulsarApplicationListener(EnvironmentsRepository environmentsRepository, PulsarAdminService pulsarAdminService) {
         this.environmentsRepository = environmentsRepository;
+        this.pulsarAdminService = pulsarAdminService;
     }
 
     @Override
@@ -65,27 +63,24 @@ public class PulsarApplicationListener implements ApplicationListener<ContextRef
                     && defaultEnvironmentName.length() > 0
                     && defaultEnvironmentServiceUrl.length() > 0
                     && !environmentEntityOptional.isPresent()) {
-                Map<String, String> header = Maps.newHashMap();
-                header.put("Content-Type", "application/json");
-                if (StringUtils.isNotBlank(pulsarJwtToken)) {
-                    header.put("Authorization", String.format("Bearer %s", pulsarJwtToken));
-                }
-                String httpTestResult = HttpUtil.doGet(defaultEnvironmentServiceUrl + "/metrics", header);
-                if (httpTestResult != null) {
-                    EnvironmentEntity environmentEntity = new EnvironmentEntity();
-                    environmentEntity.setBroker(defaultEnvironmentServiceUrl);
-                    environmentEntity.setName(defaultEnvironmentName);
-                    environmentsRepository.save(environmentEntity);
-                    log.info("Successfully added a default environment: name = {}, service_url = {}.",
-                            defaultEnvironmentName, defaultEnvironmentServiceUrl);
-                } else {
+                try {
+                    pulsarAdminService.clusters(defaultEnvironmentServiceUrl).getClusters();
+                } catch (PulsarAdminException e) {
+                    log.error("Failed to get clusters list.", e);
                     log.error("Unable to connect default environment {} via {}, " +
-                            "please check if `environment.default.name` " +
-                            "and `environment.default.broker` are set correctly, " +
-                            "environmentDefaultName, environmentDefaultBroker",
+                                    "please check if `environment.default.name` " +
+                                    "and `environment.default.broker` are set correctly, " +
+                                    "environmentDefaultName, environmentDefaultBroker",
                             defaultEnvironmentName, defaultEnvironmentServiceUrl);
                     System.exit(-1);
                 }
+
+                EnvironmentEntity environmentEntity = new EnvironmentEntity();
+                environmentEntity.setBroker(defaultEnvironmentServiceUrl);
+                environmentEntity.setName(defaultEnvironmentName);
+                environmentsRepository.save(environmentEntity);
+                log.info("Successfully added a default environment: name = {}, service_url = {}.",
+                        defaultEnvironmentName, defaultEnvironmentServiceUrl);
             } else {
                 log.warn("The default environment already exists.");
             }

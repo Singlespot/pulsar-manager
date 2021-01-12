@@ -15,14 +15,19 @@ package org.apache.pulsar.manager.service.impl;
 
 import com.github.pagehelper.Page;
 import com.google.gson.Gson;
+import com.google.gson.JsonObject;
 import com.google.gson.reflect.TypeToken;
 
 import java.text.DecimalFormat;
+
+import lombok.extern.slf4j.Slf4j;
+import org.apache.pulsar.client.admin.Brokers;
+import org.apache.pulsar.client.admin.PulsarAdminException;
+import org.apache.pulsar.manager.controller.exception.PulsarAdminOperationException;
 import org.apache.pulsar.manager.service.BrokerStatsService;
 import org.apache.pulsar.manager.service.BrokersService;
 import org.apache.pulsar.manager.service.ClustersService;
-import org.apache.pulsar.manager.service.EnvironmentCacheService;
-import org.apache.pulsar.manager.utils.HttpUtil;
+import org.apache.pulsar.manager.service.PulsarAdminService;
 import org.apache.pulsar.manager.entity.ConsumerStatsEntity;
 import org.apache.pulsar.manager.entity.ConsumersStatsRepository;
 import org.apache.pulsar.manager.entity.EnvironmentEntity;
@@ -40,10 +45,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
@@ -56,15 +58,11 @@ import org.springframework.stereotype.Service;
 @Configuration
 @Component
 @EnableScheduling
+@Slf4j
 public class BrokerStatsServiceImpl implements BrokerStatsService {
-
-    private static final Logger log = LoggerFactory.getLogger(BrokerStatsServiceImpl.class);
 
     @Value("${backend.directRequestHost}")
     private String directRequestHost;
-
-    @Value("${backend.jwt.token}")
-    private String pulsarJwtToken;
 
     @Value("${clear.stats.interval}")
     private Long clearStatsInterval;
@@ -77,10 +75,7 @@ public class BrokerStatsServiceImpl implements BrokerStatsService {
     private final PublishersStatsRepository publishersStatsRepository;
     private final ReplicationsStatsRepository replicationsStatsRepository;
     private final ConsumersStatsRepository consumersStatsRepository;
-
-    private static final Map<String, String> header = new HashMap<String, String>(){{
-        put("Content-Type","application/json");
-    }};
+    private final PulsarAdminService pulsarAdminService;
 
     @Autowired
     public BrokerStatsServiceImpl(
@@ -92,7 +87,7 @@ public class BrokerStatsServiceImpl implements BrokerStatsService {
             PublishersStatsRepository publishersStatsRepository,
             ReplicationsStatsRepository replicationsStatsRepository,
             ConsumersStatsRepository consumersStatsRepository,
-            EnvironmentCacheService environmentCache) {
+            PulsarAdminService pulsarAdminService) {
         this.environmentsRepository = environmentsRepository;
         this.clustersService = clustersService;
         this.brokersService = brokersService;
@@ -101,23 +96,19 @@ public class BrokerStatsServiceImpl implements BrokerStatsService {
         this.publishersStatsRepository = publishersStatsRepository;
         this.replicationsStatsRepository = replicationsStatsRepository;
         this.consumersStatsRepository = consumersStatsRepository;
+        this.pulsarAdminService = pulsarAdminService;
     }
 
     public String forwardBrokerStatsMetrics(String broker, String requestHost) {
-        if (StringUtils.isNotBlank(pulsarJwtToken)) {
-            header.put("Authorization", String.format("Bearer %s", pulsarJwtToken));
-        }
-
         broker = checkServiceUrl(broker, requestHost);
-        return HttpUtil.doGet(broker + "/admin/v2/broker-stats/metrics", header);
-    }
-
-    public String forwardBrokerStatsTopics(String broker, String requestHost) {
-        if (StringUtils.isNotBlank(pulsarJwtToken)) {
-            header.put("Authorization", String.format("Bearer %s", pulsarJwtToken));
+        try {
+            return pulsarAdminService.brokerStats(broker).getMetrics().toString();
+        } catch(PulsarAdminException e) {
+            PulsarAdminOperationException pulsarAdminOperationException
+                    = new PulsarAdminOperationException("Failed to get broker metrics.");
+            log.error(pulsarAdminOperationException.getMessage(), e);
+            throw pulsarAdminOperationException;
         }
-        broker = checkServiceUrl(broker, requestHost);
-        return HttpUtil.doGet(broker + "/admin/v2/broker-stats/topics", header);
     }
 
     @Scheduled(initialDelayString = "${init.delay.interval}", fixedDelayString = "${insert.stats.interval}")
@@ -133,7 +124,24 @@ public class BrokerStatsServiceImpl implements BrokerStatsService {
             clusterLists.forEach((clusterMap) -> {
                 String cluster = (String) clusterMap.get("cluster");
                 Pair<String, String> envCluster = Pair.of(env.getName(), cluster);
-                collectStatsServiceUrls.put(envCluster, (String) clusterMap.get("serviceUrl"));
+                String webServiceUrl = (String) clusterMap.get("serviceUrl");
+                if (webServiceUrl.contains(",")) {
+                    String[] webServiceUrlList = webServiceUrl.split(",");
+                    for (String url : webServiceUrlList) {
+                        if (!url.contains("http://")) {
+                            url = "http://" + url;
+                        }
+                        try {
+                            Brokers brokers = pulsarAdminService.brokers(url);
+                            brokers.healthcheck();
+                            webServiceUrl = url;
+                            break;
+                        } catch (PulsarAdminException e) {
+                            log.error("This service {} is down, please check", url);
+                        }
+                    }
+                }
+                collectStatsServiceUrls.put(envCluster, webServiceUrl);
             });
         }
         collectStatsServiceUrls.forEach((envCluster, serviceUrl) -> {
@@ -147,16 +155,19 @@ public class BrokerStatsServiceImpl implements BrokerStatsService {
     }
 
     public void collectStatsToDB(long unixTime, String env, String cluster, String serviceUrl) {
-        if (StringUtils.isNotBlank(pulsarJwtToken)) {
-            header.put("Authorization", String.format("Bearer %s", pulsarJwtToken));
-        }
         Map<String, Object> brokerObject = brokersService.getBrokersList(0, 0, cluster, serviceUrl);
         List<HashMap<String, Object>> brokerLists = (List<HashMap<String, Object>>) brokerObject.get("data");
         brokerLists.forEach((brokerMap) -> {
             String tempBroker = (String) brokerMap.get("broker");
             // TODO: handle other protocols
             String broker = "http://" + tempBroker;
-            String result = HttpUtil.doGet(broker + "/admin/v2/broker-stats/topics", header);
+            JsonObject result;
+            try {
+                result = pulsarAdminService.brokerStats(broker).getTopics();
+            } catch(PulsarAdminException e) {
+                log.error("Failed to get broker metrics.", e);
+                return;
+            }
             Gson gson = new Gson();
             HashMap<String, HashMap<String, HashMap<String, HashMap<String, PulsarManagerTopicStats>>>> brokerStatsTopicEntity = gson.fromJson(result,
                 new TypeToken<HashMap<String, HashMap<String, HashMap<String, HashMap<String, PulsarManagerTopicStats>>>>>() {

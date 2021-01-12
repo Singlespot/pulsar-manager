@@ -36,6 +36,9 @@ plugins {
 repositories {
     mavenCentral()
     mavenLocal()
+    maven {
+        url "https://yahoo.bintray.com/maven"
+    }
 }
 
 configurations {
@@ -78,6 +81,15 @@ dependencyManagement {
   applyMavenExclusions = false
 }
 
+distributions {
+    main {
+        contents {
+            from 'src/main/resources/application.properties'
+            from 'src/main/resources/bkvm.conf'
+        }
+    }
+}
+
 distTar {
     archiveName "pulsar-manager.tar"
 }
@@ -95,9 +107,12 @@ dependencies {
     compile group: 'org.springframework.boot', name: 'spring-boot-starter-web', version: springBootVersion
     compile group: 'org.springframework.cloud', name: 'spring-cloud-starter-netflix-zuul', version: springBootVersion
     compile group: 'org.mybatis.spring.boot', name: 'mybatis-spring-boot-starter', version: springMybatisVersion
+    compile group: 'com.github.pagehelper', name: 'pagehelper', version: pagehelperVersion
     compile group: 'org.springframework.boot', name: 'spring-boot-starter-thymeleaf', version: springBootVersion
     compile group: 'org.postgresql', name: 'postgresql', version: postgresqlVersion
-    compile group: 'org.herddb', name: 'herddb-jdbc', version: herddbVersion
+    compile (group: 'org.herddb', name: 'herddb-jdbc', version: herddbVersion) {
+        exclude group: 'org.slf4j', module: 'slf4j-jdk14'
+        }
     compile group: 'javax.validation', name: 'validation-api', version: javaxValidationVersion
     compile group: 'org.hibernate', name: 'hibernate-validator', 'version': hibernateValidatorVersion
     compile group: 'io.jsonwebtoken', name: 'jjwt-api', version: jsonWebTokenApiVersion
@@ -107,15 +122,32 @@ dependencies {
     compile group: 'com.google.guava', name: 'guava', version: guavaVersion
     compile group: 'com.google.code.gson', name: 'gson', version: gsonVersion
     compile group: 'org.apache.pulsar', name: 'pulsar-common', version: pulsarVersion
-    compile group: 'org.apache.pulsar', name: 'pulsar-client-admin', version: pulsarVersion
+    compile group: 'org.apache.pulsar', name: 'pulsar-client-admin-original', version: pulsarVersion
+    compile group: 'org.apache.pulsar', name: 'pulsar-client-auth-athenz', version: pulsarVersion
+    compile group: 'org.apache.pulsar', name: 'pulsar-client-auth-sasl', version: pulsarVersion
     compile group: 'io.springfox', name: 'springfox-swagger2', version: swagger2Version
     compile group: 'io.springfox', name: 'springfox-swagger-ui', version: swaggeruiVersion
-    compile group: 'org.apache.pulsar', name: 'pulsar-broker', version: brokerVersion
+    compile group: 'org.apache.pulsar', name: 'pulsar-broker', version: pulsarVersion
     compile group: 'commons-validator', name: 'commons-validator', version: commonsValidatorVersion
+    compile (group: 'org.bkvm', name: 'bkvm', version: bkvmVersion, ext: 'war', classifier:'war-no-libs') {
+        exclude group: 'org.slf4j', module: 'slf4j-jdk14'
+        exclude group: 'org.herddb', module: '*'
+    }
+    compile (group: 'org.bkvm', name: 'bkvm', version: bkvmVersion, classifier:'classes') {
+        exclude group: 'org.slf4j', module: 'slf4j-jdk14'
+        exclude group: 'org.herddb', module: '*'
+    }
+    compile (group: 'org.apache.tomcat.embed', name: 'tomcat-embed-jasper', version: tomcatVersion)
+    compile group: 'org.glassfish.jersey.containers', name: 'jersey-container-servlet', version: jerseyVersion
+    compile group: 'org.glassfish.jersey.core', name: 'jersey-client', version: jerseyVersion
+    compile group: 'org.glassfish.jersey.inject', name: 'jersey-hk2', version: jerseyVersion
+    compile group: 'org.glassfish.jersey.media', name: 'jersey-media-json-jackson', version: jerseyVersion
+    compile group: 'org.springframework.boot', name: 'spring-boot-starter-security'
+    compile group: 'org.springframework.security', name: 'spring-security-config'
     compileOnly group: 'org.projectlombok', name: 'lombok', version: lombokVersion
     compileOnly group: 'org.springframework.boot', name: 'spring-boot-devtools', version: springBootVersion
     testCompile group: 'org.springframework.boot', name: 'spring-boot-starter-test', version: springBootVersion
     testCompile group: 'org.mockito', name: 'mockito-core', version: mockitoVersion
-    testCompile group: 'org.powermock', name: 'powermock-api-mockito', version: apiMockitoVersion
+    testCompile group: 'org.powermock', name: 'powermock-api-mockito2', version: apiMockitoVersion
     testCompile group: 'org.powermock', name: 'powermock-module-junit4', version: mockitoJunit4Version
 }

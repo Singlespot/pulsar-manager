@@ -13,23 +13,23 @@
  */
 package org.apache.pulsar.manager.zuul;
 
-import org.apache.pulsar.manager.service.EnvironmentCacheService;
 import com.netflix.zuul.ZuulFilter;
 import com.netflix.zuul.context.RequestContext;
-import org.apache.commons.lang3.StringUtils;
-import org.apache.pulsar.manager.service.PulsarEvent;
-import org.apache.pulsar.manager.service.RolesService;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.cloud.netflix.zuul.filters.support.FilterConstants;
-import org.springframework.stereotype.Component;
 
-import javax.servlet.http.HttpServletRequest;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.Map;
+import javax.servlet.http.HttpServletRequest;
+
+import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.pulsar.manager.service.EnvironmentCacheService;
+import org.apache.pulsar.manager.service.PulsarAdminService;
+import org.apache.pulsar.manager.service.PulsarEvent;
+import org.apache.pulsar.manager.service.RolesService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cloud.netflix.zuul.filters.support.FilterConstants;
+import org.springframework.stereotype.Component;
 
 import static org.springframework.cloud.netflix.zuul.filters.support.FilterConstants.PRE_TYPE;
 import static org.springframework.cloud.netflix.zuul.filters.support.FilterConstants.REQUEST_URI_KEY;
@@ -38,12 +38,8 @@ import static org.springframework.cloud.netflix.zuul.filters.support.FilterConst
  * Handle http redirect and forward.
  */
 @Component
+@Slf4j
 public class EnvironmentForward extends ZuulFilter {
-
-    private static final Logger log = LoggerFactory.getLogger(EnvironmentForward.class);
-
-    @Value("${backend.jwt.token}")
-    private String pulsarJwtToken;
 
     private final EnvironmentCacheService environmentCacheService;
 
@@ -51,12 +47,16 @@ public class EnvironmentForward extends ZuulFilter {
 
     private final RolesService rolesService;
 
+    private final PulsarAdminService pulsarAdminService;
+
     @Autowired
     public EnvironmentForward(
-            EnvironmentCacheService environmentCacheService, PulsarEvent pulsarEvent, RolesService rolesService) {
+            EnvironmentCacheService environmentCacheService, PulsarEvent pulsarEvent,
+            RolesService rolesService, PulsarAdminService pulsarAdminService) {
         this.environmentCacheService = environmentCacheService;
         this.pulsarEvent = pulsarEvent;
         this.rolesService = rolesService;
+        this.pulsarAdminService = pulsarAdminService;
     }
 
     @Override
@@ -81,7 +81,8 @@ public class EnvironmentForward extends ZuulFilter {
         HttpServletRequest request = ctx.getRequest();
         String redirect = request.getParameter("redirect");
 
-        String requestUri = request.getRequestURI();
+        String requestUri = request.getServletPath();
+        request.getServletPath();
         String token = request.getHeader("token");
 
         if (!rolesService.isSuperUser(token)) {
@@ -127,18 +128,18 @@ public class EnvironmentForward extends ZuulFilter {
     }
 
     private Object forwardRequest(RequestContext ctx, HttpServletRequest request, String serviceUrl) {
-        ctx.put(REQUEST_URI_KEY, request.getRequestURI());
+        ctx.put(REQUEST_URI_KEY, request.getServletPath());
         try {
-            ctx.addZuulRequestHeader("Authorization", String.format("Bearer %s", pulsarJwtToken));
+            Map<String, String> authHeader = pulsarAdminService.getAuthHeader(serviceUrl);
+            authHeader.entrySet().forEach(entry -> ctx.addZuulRequestHeader(entry.getKey(), entry.getValue()));
             ctx.setRouteHost(new URL(serviceUrl));
-            pulsarEvent.parsePulsarEvent(request.getRequestURI(), request);
+            pulsarEvent.parsePulsarEvent(request.getServletPath(), request);
             log.info("Forward request to {} @ path {}",
-                    serviceUrl, request.getRequestURI());
+                    serviceUrl, request.getServletPath());
         } catch (MalformedURLException e) {
             log.error("Route forward to {} path {} error: {}",
-                    serviceUrl, request.getRequestURI(), e.getMessage());
+                    serviceUrl, request.getServletPath(), e.getMessage());
         }
         return null;
     }
-
 }
