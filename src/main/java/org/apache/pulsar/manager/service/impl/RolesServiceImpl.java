@@ -38,6 +38,7 @@ import org.apache.pulsar.manager.utils.ResourceType;
 import org.apache.pulsar.manager.utils.ResourceVerbs;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
@@ -205,7 +206,7 @@ public class RolesServiceImpl implements RolesService {
             result.put("message", "Create default success");
             return result;
         }
-        result.put("error", "Role is exist");
+        result.put("error", "Role already exists");
         return result;
     }
 
@@ -232,9 +233,13 @@ public class RolesServiceImpl implements RolesService {
 
     public Map<String, String> validateCurrentTenant(String token, String tenant) {
         Map<String, String> result = Maps.newHashMap();
+        if (isSuperUser(token)) {
+            result.put("message", "Tenant validation succeeded");
+            return result;
+        }
         Optional<UserInfoEntity> userInfoEntityOptional = usersRepository.findByAccessToken(token);
         if (!userInfoEntityOptional.isPresent()) {
-            result.put("error", "User no exist.");
+            result.put("error", "User does not exist.");
             return result;
         }
         UserInfoEntity userInfoEntity = userInfoEntityOptional.get();
@@ -254,10 +259,10 @@ public class RolesServiceImpl implements RolesService {
             tenantNameList.add(tenantEntity.getTenant());
         }
         if (!tenantNameList.contains(tenant)) {
-            result.put("error", "This user no include this tenant");
+            result.put("error", "This user does not include tenant " + tenant);
             return result;
         }
-        result.put("message", "Validate tenant success");
+        result.put("message", "Tenant validation succeeded");
         return result;
     }
 

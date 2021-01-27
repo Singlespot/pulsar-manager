@@ -15,6 +15,9 @@ package org.apache.pulsar.manager.service.impl;
 
 import com.google.common.collect.Maps;
 import com.google.gson.Gson;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.pulsar.manager.entity.GithubAuthEntity;
 import org.apache.pulsar.manager.entity.GithubUserInfoEntity;
@@ -25,6 +28,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.io.UnsupportedEncodingException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -45,6 +50,9 @@ public class GithubLoginServiceImpl implements ThirdPartyLoginService {
 
     @Value("${github.user.info}")
     private String githubUserInfo;
+
+    @Value("#{'${github.allowed.organizations}'.split(',\\s*')}")
+    private List<String> githubAllowedOrganizations;
 
     /**
      * Get user access token from github.
@@ -107,6 +115,39 @@ public class GithubLoginServiceImpl implements ThirdPartyLoginService {
         userInfoEntity.setEmail(githubUserInfoEntity.getEmail());
         userInfoEntity.setLocation(githubUserInfoEntity.getLocation());
         userInfoEntity.setAccessToken(authenticationMap.get("access_token"));
+        if (!isOrganizationMember(userInfoEntity)) {
+            log.error("User does not belong to an allowed organization.");
+            return null;
+        }
         return userInfoEntity;
+    }
+
+    protected Boolean isOrganizationMember(UserInfoEntity userInfoEntity) {
+        if (githubAllowedOrganizations.isEmpty()) {
+            return true;
+        }
+        List<String> organizations = fetchOrganizations(userInfoEntity.getAccessToken());
+        for (String allowedOrganization : githubAllowedOrganizations) {
+            for (String organization : organizations) {
+                if (organization.equals(allowedOrganization)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    protected List<String> fetchOrganizations(String access_token) {
+        Map<String, String> header = Maps.newHashMap();
+        header.put("Content-Type", "application/json");
+        header.put("Authorization", "token " + access_token);
+        String result = HttpUtil.doGet(githubUserInfo + "/orgs", header);
+        List<String> organizations = new ArrayList<>();
+        Gson gson = new Gson();
+        for (JsonElement org : gson.fromJson(result, JsonArray.class).getAsJsonArray()) {
+            JsonObject organization = org.getAsJsonObject();
+            organizations.add(organization.get("login").getAsString());
+        }
+        return organizations;
     }
 }

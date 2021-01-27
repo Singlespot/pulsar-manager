@@ -19,7 +19,8 @@ import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiResponse;
 import io.swagger.annotations.ApiResponses;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.pulsar.manager.entity.UserInfoEntity;
+import org.apache.pulsar.manager.entity.*;
+import org.apache.pulsar.manager.service.JwtService;
 import org.apache.pulsar.manager.service.ThirdPartyLoginService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -31,11 +32,16 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
+import javax.servlet.http.HttpServletRequest;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 
 /**
  * Callback function of third party platform login.
@@ -57,7 +63,22 @@ public class ThirdPartyLoginCallbackController {
     @Value("${github.redirect.host}")
     private String githubRedirectHost;
 
+    @Value("${github.assigned.role}")
+    private String githubAssignedRole;
+
     private final ThirdPartyLoginService thirdPartyLoginService;
+
+    @Autowired
+    private UsersRepository usersRepository;
+
+    @Autowired
+    private RolesRepository rolesRepository;
+
+    @Autowired
+    private RoleBindingRepository roleBindingRepository;
+
+    @Autowired
+    private JwtService jwtService;
 
     @Autowired
     public ThirdPartyLoginCallbackController(ThirdPartyLoginService thirdPartyLoginService) {
@@ -86,10 +107,56 @@ public class ThirdPartyLoginCallbackController {
             model.addAttribute("flag", false);
             return "index";
         }
+        log.info("Authentication successful, logging in");
         model.addAttribute("message", "Authentication successful, logging in");
         model.addAttribute("flag", true);
-        model.addAttribute("userInfo", userInfoEntity);
+        UserInfoEntity localUserInfoEntity = syncUser(userInfoEntity);
+        assignRole(localUserInfoEntity);
+        String token = jwtService.toToken(localUserInfoEntity.getAccessToken() + System.currentTimeMillis());
+        localUserInfoEntity.setAccessToken(token);
+        usersRepository.update(localUserInfoEntity);
+        HttpServletRequest request = ((ServletRequestAttributes) Objects.requireNonNull(RequestContextHolder.getRequestAttributes())).getRequest();
+        jwtService.setToken(request.getSession().getId(), token);
+        model.addAttribute("userInfo", localUserInfoEntity);
         return "index";
+    }
+
+    protected UserInfoEntity syncUser(UserInfoEntity externalUserInfoEntity) {
+        Optional<UserInfoEntity> localUserInfoEntityOptional = usersRepository.findByUserName(externalUserInfoEntity.getName());
+        UserInfoEntity localUserInfoEntity;
+        if (localUserInfoEntityOptional.isPresent()) {
+            localUserInfoEntity = localUserInfoEntityOptional.get();
+            localUserInfoEntity.setAccessToken(externalUserInfoEntity.getAccessToken());
+            usersRepository.update(localUserInfoEntity);
+        } else {
+            localUserInfoEntity = new UserInfoEntity();
+            localUserInfoEntity.setAccessToken(externalUserInfoEntity.getAccessToken());
+            localUserInfoEntity.setCompany(externalUserInfoEntity.getCompany());
+            localUserInfoEntity.setLocation(externalUserInfoEntity.getLocation());
+            localUserInfoEntity.setEmail(externalUserInfoEntity.getEmail());
+            localUserInfoEntity.setName(externalUserInfoEntity.getName());
+            localUserInfoEntity.setUserId(usersRepository.save(localUserInfoEntity));
+        }
+        return localUserInfoEntity;
+    }
+
+    protected void assignRole(UserInfoEntity userInfoEntity) {
+        if (!githubAssignedRole.isEmpty()) {
+            Optional<RoleInfoEntity> roleInfoEntityOptional = rolesRepository.findByRoleName(githubAssignedRole, "admin");
+            if (roleInfoEntityOptional.isPresent()) {
+                RoleInfoEntity roleInfoEntity = roleInfoEntityOptional.get();
+                Optional<RoleBindingEntity> roleBindingEntityOptional = roleBindingRepository.findByUserIdAndRoleId(userInfoEntity.getUserId(), roleInfoEntity.getRoleId());
+                if (!roleBindingEntityOptional.isPresent()) {
+                    RoleBindingEntity roleBindingEntity = new RoleBindingEntity();
+                    roleBindingEntity.setName(userInfoEntity.getName());
+                    roleBindingEntity.setRoleId(roleInfoEntity.getRoleId());
+                    roleBindingEntity.setUserId(userInfoEntity.getUserId());
+                    roleBindingRepository.save(roleBindingEntity);
+                }
+            } else {
+                log.error("Cannot assign role. Role " + githubAssignedRole + " does not exist.");
+            }
+        }
     }
 
     @ApiOperation(value = "Github's third-party authorized login address, HTTP GET request, needs to carry " +
@@ -103,7 +170,7 @@ public class ThirdPartyLoginCallbackController {
     @RequestMapping(value = "/github/login", method = RequestMethod.GET)
     public @ResponseBody ResponseEntity<Map<String, Object>> getGithubLoginUrl() {
         Map<String, Object> result = Maps.newHashMap();
-        String url = githubLoginHost + "?client_id=" + githubClientId +
+        String url = githubLoginHost + "?client_id=" + githubClientId + "&scope=read:org" +
                 "&redirect_host=" + githubRedirectHost + "/pulsar-manager/third-party-login/callback/github";
         try {
             result.put("url", URLEncoder.encode(url, StandardCharsets.UTF_8.toString()));

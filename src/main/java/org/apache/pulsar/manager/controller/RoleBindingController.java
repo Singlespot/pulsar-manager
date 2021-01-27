@@ -72,7 +72,7 @@ public class RoleBindingController {
             @ApiResponse(code = 500, message = "Internal server error")
     })
     @RequestMapping(value = "/role-binding", method =  RequestMethod.GET)
-    public ResponseEntity<Map<String, Object>> getRoleBingList(
+    public ResponseEntity<Map<String, Object>> getRoleBindingList(
             @ApiParam(value = "page_num", defaultValue = "1", example = "1")
             @RequestParam(name = "page_num", defaultValue = "1")
             @Min(value = 1, message = "page_num is incorrect, should be greater than 0.")
@@ -161,13 +161,13 @@ public class RoleBindingController {
         Optional<RoleBindingEntity> oldRoleBindingEntityOptional = roleBindingRepository.findByUserIdAndRoleId(
                 roleBindingEntity.getUserId(), roleBindingEntity.getRoleId());
         if (!oldRoleBindingEntityOptional.isPresent()) {
-            result.put("error", "Update failed, role binding no exist");
+            result.put("error", "Update failed, role binding does not exist");
             return ResponseEntity.ok(result);
         }
 
         Optional<UserInfoEntity> checkUserInfoEntityOptional = usersRepository.findByUserName(userName);
         if (!checkUserInfoEntityOptional.isPresent()) {
-            result.put("error", "User no exist.");
+            result.put("error", "User does not exist.");
             return ResponseEntity.ok(result);
         }
         UserInfoEntity checkUserInfoEntity = checkUserInfoEntityOptional.get();
@@ -175,7 +175,7 @@ public class RoleBindingController {
         Optional<RoleBindingEntity> newRoleBindingEntityOptional = roleBindingRepository.findByUserIdAndRoleId(
                 checkUserInfoEntity.getUserId(), roleBindingEntity.getRoleId());
         if (newRoleBindingEntityOptional.isPresent()) {
-            result.put("error", "This role binding is exist");
+            result.put("error", "This role binding already exists");
             return ResponseEntity.ok(result);
         }
         roleBindingEntity.setRoleBindingId(oldRoleBindingEntityOptional.get().getRoleBindingId());

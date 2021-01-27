@@ -53,18 +53,14 @@
       </el-form-item>
 
       <el-button :loading="loading" type="primary" style="width:100%;margin-bottom:30px;" @click.native.prevent="handleLogin">{{ $t('login.logIn') }}</el-button>
-      <!-- <el-button class="thirdparty-button" type="primary" @click="showDialog=true">
-        Or connect with
-      </el-button> -->
+      <el-button class="thirdparty-button" type="primary" @click="githubHandleClick('github')">
+        Or connect with Github
+      </el-button>
     </el-form>
 
-    <el-dialog :title="$t('login.thirdparty')" :visible.sync="showDialog" append-to-body>
-      {{ $t('login.thirdpartyTips') }}
-      <br>
-      <br>
-      <br>
+    <!-- <el-dialog :title="$t('login.thirdparty')" :visible.sync="showDialog" append-to-body>
       <social-sign />
-    </el-dialog>
+    </el-dialog> -->
 
   </div>
 </template>
@@ -74,6 +70,8 @@ import LangSelect from '@/components/LangSelect'
 import SocialSign from './socialsignin'
 import { getCsrfToken } from '@/api/tokens'
 import { setCsrfToken } from '@/utils/csrfToken'
+import openWindow from '@/utils/openWindow'
+import { getGithubLoginHost } from '@/api/socialsignin'
 
 export default {
   name: 'Login',
@@ -136,10 +134,31 @@ export default {
         this.passwordType = 'password'
       }
     },
+    githubHandleClick(thirdpart) {
+      getGithubLoginHost().then(response => {
+        if (!response.data) return
+        if (response.data.message === 'success') {
+          openWindow(decodeURIComponent(response.data.url), thirdpart, 540, 540)
+        } else {
+          this.$notify({
+            title: 'failed',
+            message: response.data.message,
+            type: 'error',
+            duration: 3000
+          })
+        }
+      })
+    },
     handleMessage(event) {
       const data = event.data
       if (data.hasOwnProperty('name') && data.hasOwnProperty('accessToken')) {
-        // to do set token, track task https://github.com/apache/pulsar-manager/issues/14
+        this.loading = true
+        this.$store.dispatch('LoginByGithub', data).then(() => {
+          this.loading = false
+          this.$router.push({ path: this.redirect || '/management/roles' })
+        }).catch(() => {
+          this.loading = false
+        })
       }
     },
     handleLogin() {

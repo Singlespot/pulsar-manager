@@ -49,7 +49,7 @@ public class RoleBindingServiceImpl implements RoleBindingService {
         Map<String, String> result = Maps.newHashMap();
         Optional<UserInfoEntity> userInfoEntityOptional = usersRepository.findByAccessToken(token);
         if (!userInfoEntityOptional.isPresent()) {
-            result.put("error", "User no exist.");
+            result.put("error", "User does not exist.");
             return result;
         }
         UserInfoEntity userInfoEntity = userInfoEntityOptional.get();
@@ -72,7 +72,7 @@ public class RoleBindingServiceImpl implements RoleBindingService {
 
         Optional<UserInfoEntity> userInfoEntityOptional = usersRepository.findByUserName(userName);
         if (!userInfoEntityOptional.isPresent()) {
-            result.put("error", "The user is not exist");
+            result.put("error", "The user does not exist");
             return result;
         }
         Map<String, String> validateResult = rolesService.validateCurrentTenant(token, tenant);
@@ -83,17 +83,17 @@ public class RoleBindingServiceImpl implements RoleBindingService {
 
         Optional<RoleInfoEntity> roleInfoEntityOptional = rolesRepository.findByRoleName(roleName, tenant);
         if (!roleInfoEntityOptional.isPresent()) {
-            result.put("error", "This role is no exist");
+            result.put("error", "This role does not exist");
             return result;
         }
 
         Optional<RoleBindingEntity> roleBindingEntityOptional = roleBindingRepository.findByUserIdAndRoleId(
                 userInfoEntityOptional.get().getUserId(), roleInfoEntityOptional.get().getRoleId());
         if (roleBindingEntityOptional.isPresent()) {
-            result.put("error", "Role binding already exist");
+            result.put("error", "Role binding already exists");
             return result;
         }
-        result.put("message", "Validate create role success");
+        result.put("message", "Create role validation succeeded");
         result.put("roleId", roleInfoEntityOptional.get().getRoleId());
         result.put("userId", userInfoEntityOptional.get().getUserId());
         return result;

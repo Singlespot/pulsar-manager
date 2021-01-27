@@ -103,7 +103,7 @@ public class LoginController {
             UserInfoEntity userInfoEntity = userInfoEntityOptional.get();
             String password = DigestUtils.sha256Hex(userPassword);
             if (!password.equals(userInfoEntity.getPassword())) {
-                result.put("error", "The user name or password not incorrect");
+                result.put("error", "The user name or password are incorrect");
                 return ResponseEntity.ok(result);
             }
             String token = jwtService.toToken(userAccount + password + System.currentTimeMillis());

@@ -32,7 +32,7 @@
         if (flag) {
             var userInfo = [[${userInfo}]]
             var targetOrigin = window.opener;
-            targetOrigin.postMessage(userInfo, 'http://' + window.location.host);
+            targetOrigin.postMessage(userInfo, window.location.protocol + '//' + window.location.host);
             window.close();
         }
     }
