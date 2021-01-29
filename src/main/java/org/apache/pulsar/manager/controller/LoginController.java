@@ -14,19 +14,14 @@
 package org.apache.pulsar.manager.controller;
 
 import com.google.common.collect.Maps;
-import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.codec.digest.DigestUtils;
-import org.apache.pulsar.manager.entity.RoleBindingEntity;
-import org.apache.pulsar.manager.entity.RoleBindingRepository;
-import org.apache.pulsar.manager.entity.RoleInfoEntity;
-import org.apache.pulsar.manager.entity.RolesRepository;
-import org.apache.pulsar.manager.entity.UserInfoEntity;
-import org.apache.pulsar.manager.entity.UsersRepository;
-import org.apache.pulsar.manager.service.JwtService;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiResponse;
 import io.swagger.annotations.ApiResponses;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.codec.digest.DigestUtils;
+import org.apache.pulsar.manager.entity.*;
+import org.apache.pulsar.manager.service.JwtService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
@@ -97,7 +92,7 @@ public class LoginController {
         if (userManagementEnable) {
             Optional<UserInfoEntity> userInfoEntityOptional = usersRepository.findByUserName(userAccount);
             if (!userInfoEntityOptional.isPresent()) {
-                result.put("error", "The user is not exist");
+                result.put("error", "The user does not exist");
                 return ResponseEntity.ok(result);
             }
             UserInfoEntity userInfoEntity = userInfoEntityOptional.get();

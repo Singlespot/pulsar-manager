@@ -53,14 +53,10 @@
       </el-form-item>
 
       <el-button :loading="loading" type="primary" style="width:100%;margin-bottom:30px;" @click.native.prevent="handleLogin">{{ $t('login.logIn') }}</el-button>
-      <el-button class="thirdparty-button" type="primary" @click="githubHandleClick('github')">
-        Or connect with Github
+      <el-button class="thirdparty-button" type="primary" @click="githubLogin()">
+        Sign in with Github
       </el-button>
     </el-form>
-
-    <!-- <el-dialog :title="$t('login.thirdparty')" :visible.sync="showDialog" append-to-body>
-      <social-sign />
-    </el-dialog> -->
 
   </div>
 </template>
@@ -70,8 +66,7 @@ import LangSelect from '@/components/LangSelect'
 import SocialSign from './socialsignin'
 import { getCsrfToken } from '@/api/tokens'
 import { setCsrfToken } from '@/utils/csrfToken'
-import openWindow from '@/utils/openWindow'
-import { getGithubLoginHost } from '@/api/socialsignin'
+import { getGithubLoginUrl } from '@/api/socialsignin'
 
 export default {
   name: 'Login',
@@ -87,7 +82,7 @@ export default {
     // }
     const validatePassword = (rule, value, callback) => {
       if (value.length < 6) {
-        callback(new Error('The password can not be less than 6 digits'))
+        callback(new Error('The password cannot be shorter than 6 characters'))
       } else {
         callback()
       }
@@ -134,33 +129,6 @@ export default {
         this.passwordType = 'password'
       }
     },
-    githubHandleClick(thirdpart) {
-      getGithubLoginHost().then(response => {
-        if (!response.data) return
-        if (response.data.message === 'success') {
-          openWindow(decodeURIComponent(response.data.url), thirdpart, 540, 540)
-        } else {
-          this.$notify({
-            title: 'failed',
-            message: response.data.message,
-            type: 'error',
-            duration: 3000
-          })
-        }
-      })
-    },
-    handleMessage(event) {
-      const data = event.data
-      if (data.hasOwnProperty('name') && data.hasOwnProperty('accessToken')) {
-        this.loading = true
-        this.$store.dispatch('LoginByGithub', data).then(() => {
-          this.loading = false
-          this.$router.push({ path: this.redirect || '/management/roles' })
-        }).catch(() => {
-          this.loading = false
-        })
-      }
-    },
     handleLogin() {
       this.$refs.loginForm.validate(valid => {
         if (valid) {
@@ -176,6 +144,9 @@ export default {
           return false
         }
       })
+    },
+    githubLogin() {
+      window.location = getGithubLoginUrl()
     },
     afterQRScan() {
       // const hash = window.location.hash.slice(1)

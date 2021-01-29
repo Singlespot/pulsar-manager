@@ -86,16 +86,6 @@ const user = {
       })
     },
 
-    LoginByGithub({ commit }, userInfo) {
-      return new Promise((resolve, reject) => {
-        commit('SET_TOKEN', userInfo.accessToken)
-        setToken(userInfo.accessToken)
-        setName(userInfo.name)
-        setTenant('admin')
-        resolve()
-      })
-    },
-
     // 获取用户信息
     GetUserInfo({ commit, state }) {
       return new Promise((resolve, reject) => {

@@ -21,3 +21,7 @@ export function getGithubLoginHost() {
     method: 'get'
   })
 }
+
+export function getGithubLoginUrl() {
+  return BASE_URL + `/github/login`
+}
