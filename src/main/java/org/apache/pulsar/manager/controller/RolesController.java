@@ -228,6 +228,7 @@ public class RolesController {
     public ResponseEntity<Map<String, Object>> getResourceType() {
         Map<String, Object> result = Maps.newHashMap();
         Set<String> resourceTypeList = Sets.newHashSet();
+        resourceTypeList.add(ResourceType.TENANTS.name());
         resourceTypeList.add(ResourceType.NAMESPACES.name());
         resourceTypeList.add(ResourceType.TOPICS.name());
         resourceTypeList.add(ResourceType.SCHEMAS.name());

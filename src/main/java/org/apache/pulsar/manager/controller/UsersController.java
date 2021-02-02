@@ -135,21 +135,21 @@ public class UsersController {
             result.put("error", validateResult.get("error"));
             return ResponseEntity.ok(result);
         }
-        Optional<UserInfoEntity> optionalUserEntity =  usersRepository.findByUserName(userInfoEntity.getName());
+        Optional<UserInfoEntity> optionalUserEntity = usersRepository.findByUserName(userInfoEntity.getName());
         if (optionalUserEntity.isPresent()) {
-            result.put("error", "User already exist, please check");
+            result.put("error", "User already exists, please check");
             return ResponseEntity.ok(result);
         }
         userInfoEntity.setPassword(DigestUtils.sha256Hex(userInfoEntity.getPassword()));
         usersRepository.save(userInfoEntity);
         // Create default role and tenant
-        Map<String, String> defaultRoleCreate = rolesService.createDefaultRoleAndTenant(
-                userInfoEntity.getName(), request.getHeader("environment"));
-        if (defaultRoleCreate.get("error") != null) {
-            result.put("error", defaultRoleCreate.get("error"));
-            return ResponseEntity.ok(result);
-        }
-        result.put("message", "Create user success");
+//         Map<String, String> defaultRoleCreate = rolesService.createDefaultRoleAndTenant(
+//                 userInfoEntity.getName(), request.getHeader("environment"));
+//         if (defaultRoleCreate.get("error") != null) {
+//             result.put("error", defaultRoleCreate.get("error"));
+//             return ResponseEntity.ok(result);
+//         }
+        result.put("message", "User creation succeeded");
         return ResponseEntity.ok(result);
     }
 
@@ -164,22 +164,22 @@ public class UsersController {
         Map<String, Object> result = Maps.newHashMap();
         Optional<UserInfoEntity> userInfoEntityOptional = usersRepository.findByUserName(userInfoEntity.getName());
         if (!userInfoEntityOptional.isPresent()) {
-            result.put("error", "Failed update a user, user does not exist");
+            result.put("error", "User update failed, user does not exist");
             return ResponseEntity.ok(result);
         }
         if (StringUtils.isBlank(userInfoEntity.getEmail())) {
-            result.put("error", "Failed update a user, email is not be empty");
+            result.put("error", "User update failed, email cannot be empty");
             return ResponseEntity.ok(result);
         }
         if (!EmailValidator.getInstance().isValid(userInfoEntity.getEmail())) {
-            result.put("error", "Email address illegal");
+            result.put("error", "Invalid email address");
             return ResponseEntity.ok(result);
         }
-        UserInfoEntity existUerInfoEntity = userInfoEntityOptional.get();
-        userInfoEntity.setPassword(existUerInfoEntity.getPassword());
-        userInfoEntity.setAccessToken(existUerInfoEntity.getAccessToken());
+        UserInfoEntity existUserInfoEntity = userInfoEntityOptional.get();
+        userInfoEntity.setPassword(existUserInfoEntity.getPassword());
+        userInfoEntity.setAccessToken(existUserInfoEntity.getAccessToken());
         usersRepository.update(userInfoEntity);
-        result.put("message", "Update a user success");
+        result.put("message", "User update succeeded");
         return ResponseEntity.ok(result);
     }
 
@@ -217,7 +217,7 @@ public class UsersController {
             String token = request.getHeader("token");
             Optional<UserInfoEntity> userInfoEntityOptional = usersRepository.findByAccessToken(token);
             if (!userInfoEntityOptional.isPresent()) {
-                result.put("error", "User is no exist");
+                result.put("error", "User does not exist");
                 return ResponseEntity.ok(result);
             }
             UserInfoEntity userInfoEntity = userInfoEntityOptional.get();
@@ -264,7 +264,7 @@ public class UsersController {
         // 0 is super role
         Optional<RoleInfoEntity> roleInfoEntityOptional = rolesRepository.findByRoleFlag(0);
         if (roleInfoEntityOptional.isPresent()) {
-            result.put("error", "Super user role is exist, this interface is no longer available");
+            result.put("error", "Super user role already exists, this interface is no longer available");
             return ResponseEntity.ok(result);
         }
         Map<String, String> userValidateResult = usersService.validateUserInfo(userInfoEntity);
@@ -273,7 +273,7 @@ public class UsersController {
             return ResponseEntity.ok(result);
         }
         if (StringUtils.isBlank(userInfoEntity.getPassword())) {
-            result.put("error", "Please provider password");
+            result.put("error", "Please provide password");
             return ResponseEntity.ok(result);
         }
 

@@ -107,14 +107,14 @@ public class AdminHandlerInterceptor extends HandlerInterceptorAdapter {
         if (!rolesService.isSuperUser(token)) {
             if (requestUri.startsWith("/admin/v2/clusters")
                     || requestUri.startsWith("/admin/v2/brokers")) {
-                map.put("message", "This user no permissions for this resource");
+                map.put("message", "This user has no permissions for this resource");
                 response.setStatus(401);
                 response.getWriter().append(gson.toJson(map));
                 return false;
             }
             if (requestUri.startsWith("/admin/v2/tenants")) {
                 if (request.getMethod() != "GET") {
-                    map.put("message", "This user no permissions for this resource");
+                    map.put("message", "This user has no permissions for this resource");
                     response.setStatus(401);
                     response.getWriter().append(gson.toJson(map));
                     return false;

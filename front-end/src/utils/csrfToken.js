@@ -19,8 +19,8 @@ export function getCsrfToken() {
   return Cookies.get(csrfToken)
 }
 
-export function setCsrfToken(csrfToken) {
-  return Cookies.set(csrfToken, csrfToken)
+export function setCsrfToken(csrfTokenValue) {
+  return Cookies.set(csrfToken, csrfTokenValue)
 }
 
 export function removeCsrfToken() {

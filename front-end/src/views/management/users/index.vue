@@ -88,7 +88,7 @@
         <el-form-item v-if="dialogStatus==='create'" :label="$t('user.colUserCompany')">
           <el-input :rows="2" v-model="form.company" :placeholder="$t('user.userCompnayPlaceHolder')"/>
         </el-form-item>
-        <el-form-item v-if="dialogStatus==='create'" :label="$t('uesr.colUserPassword')" prop="password">
+        <el-form-item v-if="dialogStatus==='create'" :label="$t('user.colUserPassword')" prop="password">
           <el-input :rows="2" v-model="form.password" :placeholder="$t('user.userPasswordPlaceHolder')" type="password"/>
         </el-form-item>
         <el-form-item v-if="dialogStatus==='create'" :label="$t('user.colUserPasswordRepeat')" prop="repeatPassword">

@@ -779,7 +779,7 @@ export default {
     updateTokenSucccessNotification: 'Successfully update a token for role'
   },
   user: {
-    buttonNewUser: 'New a user',
+    buttonNewUser: 'Create user',
     colUserName: 'User Name',
     colUserDesc: 'User Description',
     colUserEmail: 'User Email',
@@ -795,9 +795,9 @@ export default {
     userLocationPlaceHolder: 'Please input user location',
     userCompanyPlaceHolder: 'Please input user company',
     userPasswordPlaceHolder: 'Please input user password',
-    newUser: 'New a user',
-    deleteUser: 'Delete a user',
-    updateUser: 'Update a user',
+    newUser: 'Create user',
+    deleteUser: 'Delete user',
+    updateUser: 'Update user',
     userNameIsRequired: 'The name can not is empty',
     userEmailIsRequired: 'The email can not is empty',
     userPasswordIsRequired: 'The password can not is empty',
@@ -808,7 +808,7 @@ export default {
   },
   role: {
     roleAlreadyExists: 'Role already exists',
-    buttonNewRole: 'New a Role',
+    buttonNewRole: 'Create role',
     colRoleName: 'Role Name',
     colRoleDesc: 'Role Description',
     colResourceType: 'Resource Type',
@@ -823,12 +823,12 @@ export default {
     resourcePlaceHolder: 'Please select resource',
     resourceVerbsPlaceHolder: 'Please select role verbs',
     resourceDescPlaceHolder: 'Please input role description',
-    newRole: 'New a Role',
-    deleteRole: 'Delete a Role',
-    updateRole: 'Update a Role',
-    roleNameIsRequired: 'The name can not is empty',
-    creatRoleNotification: 'Create a role success',
-    deleteRoleNotification: 'Delete a role success',
-    updateRoleNotification: 'Update a role success'
+    newRole: 'Create role',
+    deleteRole: 'Delete role',
+    updateRole: 'Update role',
+    roleNameIsRequired: 'The name cannot be empty',
+    creatRoleNotification: 'Role creation succeeded',
+    deleteRoleNotification: 'Role deletion succeeded',
+    updateRoleNotification: 'Role update succeeded'
   }
 }
